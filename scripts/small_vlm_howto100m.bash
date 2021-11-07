@@ -4,7 +4,7 @@ GPUS=$1
 NAME=$2
 
 # Create dirs and make backup
-output=snap/vlm/$NAME
+output=/ssd_scratch/users/mounika.k/snap/vlm/$NAME
 mkdir -p $output/src
 cp -r vlm $output/src/
 cp scripts/run_glue_at_epoch.bash $output/run_glue_at_epoch.bash 

@@ -28,7 +28,7 @@ WIKI_DUMP_NAME=${lg}wiki-latest-pages-articles.xml.bz2
 WIKI_DUMP_LINK=https://dumps.wikimedia.org/${lg}wiki/latest/$WIKI_DUMP_NAME
 
 # install tools
-data/wiki/install-tools.sh $TOOLS_PATH
+data/wiki/install-tools.bash $TOOLS_PATH
 
 # create Wiki paths
 mkdir -p $WIKI_PATH/bz2

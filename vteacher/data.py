@@ -12,7 +12,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 import tqdm
 # feature_dir_data = 'data/howto100m'
-feature_dir = '/net/bvisionserver3/playpen10/terran/'
+feature_dir = '/ssd_scratch/users/mounika.k/'
 feature_dir_data = '/net/bvisionserver3/playpen10/terran/'
 
 def find_overlap(s1, s2):
@@ -32,14 +32,14 @@ class CoLDataset(Dataset):
         
         self.use_clip = False
         if self.use_clip:
-            features = list(glob.iglob(feature_dir+'howto100m_clipfeature/*'))
+            features = list(glob.iglob(feature_dir+'HowTo100M_sample_clip/*'))
         else:            
             features = list(glob.iglob(feature_dir+'howto100m_feature3d/*'))
             
-        features0 = list(glob.iglob(feature_dir+'howto100m_feature/*'))
+        # features0 = list(glob.iglob(feature_dir+'howto100m_feature/*'))
         self.keys = [item.split('/')[-1].split('.')[0] for item in features]
-        self.keys_temp = [item.split('/')[-1].split('.')[0] for item in features0]
-        self.keys = list(set(self.keys).intersection(set(self.keys_temp)))
+        # self.keys_temp = [item.split('/')[-1].split('.')[0] for item in features0]
+        # self.keys = list(set(self.keys).intersection(set(self.keys_temp)))
         if mode == 'train':
             self.data = json.load(open(feature_dir+'pretraining_dataset_data_train.json'))
             self.all_keys = json.load(open(feature_dir+'pretraining_dataset_keys_train.json'))
@@ -93,19 +93,20 @@ class CoLDataset(Dataset):
                 feat_bn = np.zeros([self.max_v_len, 2048])
         else:
             try: 
-                feat_clip = np.load(os.path.join(feature_dir_data+'howto100m_clipfeature/', "{}.npy".format(example)), allow_pickle=True)
+                feat_clip = np.load(os.path.join(feature_dir+'HowTo100M_sample_clip/', "{}.npy".format(example)), allow_pickle=True)
                 feat_clip/=np.linalg.norm(feat_clip, ord=2, axis=-1, keepdims=True)
-                feat_resnet = np.load(os.path.join(feature_dir_data+'howto100m_feature/', "{}.npy".format(example)), allow_pickle=True)
-                feat_resnet/=np.linalg.norm(feat_resnet, ord=2, axis=-1, keepdims=True)
-                feat_resnet = np.concatenate([feat_resnet, feat_clip[:len(feat_resnet)]], -1)
-                feat_bn = np.load(os.path.join(feature_dir_data+'howto100m_feature3d/', "{}.npy".format(example)), allow_pickle=True)
-                feat_bn/=np.linalg.norm(feat_bn, ord=2, axis=-1, keepdims=True)
+                # feat_resnet = np.load(os.path.join(feature_dir_data+'howto100m_feature/', "{}.npy".format(example)), allow_pickle=True)
+                # feat_resnet/=np.linalg.norm(feat_resnet, ord=2, axis=-1, keepdims=True)
+                # feat_resnet = np.concatenate([feat_resnet, feat_clip[:len(feat_resnet)]], -1)
+                # feat_bn = np.load(os.path.join(feature_dir_data+'howto100m_feature3d/', "{}.npy".format(example)), allow_pickle=True)
+                # feat_bn/=np.linalg.norm(feat_bn, ord=2, axis=-1, keepdims=True)
             except:
                 print('didnt found the feature')
-                feat_resnet = np.zeros([self.max_v_len, 2048+512])
-                feat_bn = np.zeros([self.max_v_len, 2048])
-#         feat_bn = np.zeros([feat_resnet.shape[0], 2048])        
-        video_feature, video_mask = self._load_indexed_video_feature_untied(feat_resnet, feat_bn, start, end)
+                # feat_resnet = np.zeros([self.max_v_len, 2048+512])
+                # feat_bn = np.zeros([self.max_v_len, 2048])
+        # feat_bn = np.zeros([feat_resnet.shape[0], 2048])        
+        # video_feature, video_mask = self._load_indexed_video_feature_untied(feat_resnet, feat_bn, start, end)
+        video_feature, video_mask = self._load_indexed_video_feature_untied(feat_clip, start, end)
 
         encoded_sent = self.tokenizer.encode_plus(
             sent,
