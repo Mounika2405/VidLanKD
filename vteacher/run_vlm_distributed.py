@@ -520,6 +520,7 @@ def evaluate(args, eval_dataset, model, tokenizer, visn_model=None, prefix="") -
 
     # Eval!
     logger.info("***** Running evaluation {} *****".format(prefix))
+    print(("  Num examples = %d", len(eval_dataset)))
     logger.info("  Num examples = %d", len(eval_dataset))
     logger.info("  Batch size = %d", args.eval_batch_size)
     total_token_loss = 0.0
@@ -531,6 +532,7 @@ def evaluate(args, eval_dataset, model, tokenizer, visn_model=None, prefix="") -
         visn_model.eval()
 
     for tokens, vokens in tqdm(eval_dataloader, desc="Evaluating"):
+        print('tokens', tokens)
         token_inputs, token_labels, voken_labels = mask_tokens(tokens, vokens, tokenizer, args)
         token_inputs = token_inputs.to(args.device)
         token_labels = token_labels.to(args.device) if args.mlm_ratio != 0 else None
@@ -565,8 +567,10 @@ def evaluate(args, eval_dataset, model, tokenizer, visn_model=None, prefix="") -
             total_token_loss += token_loss.item()
 
         nb_eval_steps += 1
+        print('Incrementing nb_eval_steps...', nb_eval_steps)
 #         if nb_eval_steps >= 100:
 #             break
+    print('nb_eval_steps', nb_eval_steps)
     total_token_loss = total_token_loss / nb_eval_steps
     perplexity = torch.exp(torch.tensor(total_token_loss)).item()
 
@@ -658,7 +662,6 @@ def setup(gpu, args):
         )
 
     assert args.block_size <= tokenizer.max_len
-
     # Barrier to make sure only the first process in distributed training process the dataset,
     # and the others will use the cache
     if gpu != 0:
@@ -669,7 +672,8 @@ def setup(gpu, args):
         torch.distributed.barrier()
 
     config_kwargs = {}
-    config_kwargs['voken_dim'] = 2048 * 2
+    # config_kwargs['voken_dim'] = 2048 * 2
+    config_kwargs['voken_dim'] = 512
 
     # Get Config
     if args.config_name:
@@ -680,7 +684,7 @@ def setup(gpu, args):
             do_voken_cls=args.do_voken_cls,
             do_voken_reg=args.do_voken_reg,
             do_voken_ctr=args.do_voken_ctr,
-            use_clip=args.use_clip,
+            use_clip=True,
             shared_head=args.shared_head,
             voken_hinge_loss=args.voken_hinge_loss,
             margin=args.margin,
@@ -712,7 +716,7 @@ def setup(gpu, args):
     else:
         visn_model = None
     model.to(args.device)
-
+    
     # End of barrier to make sure only the first process waiting other processes
     if gpu == 0:
         torch.distributed.barrier()

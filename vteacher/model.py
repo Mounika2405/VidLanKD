@@ -338,7 +338,7 @@ class BertVideoEncoder(nn.Module):
     def __init__(self, config, use_clip):
         super(BertVideoEncoder, self).__init__()
         if use_clip:            
-            hidden_dim = 2048+2048+512
+            hidden_dim = 512
         else:
             hidden_dim = 2048+2048
         self.new_video_embeddings = nn.Sequential(

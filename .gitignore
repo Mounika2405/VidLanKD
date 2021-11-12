@@ -3,3 +3,5 @@ S3D_HowTo100M
 extract_features.log
 3D-ResNets-PyTorch
 ResNet-Video-Features
+core
+*/__pycache__

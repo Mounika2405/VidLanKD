@@ -27,12 +27,12 @@ class CoLDataset(Dataset):
     sent_strategy = 'first'
 
     def __init__(self, mode, tokenizer, block_size=512,
-                 split_sent=False, voken_dir=None, suffix=None, verbose=False,
-                 voken_ablation=None, use_clip=None):
+                 split_sent=False, use_clip=True, voken_dir=None, suffix=None, verbose=False,
+                 voken_ablation=None):
         
-        self.use_clip = False
+        self.use_clip = True
         if self.use_clip:
-            features = list(glob.iglob(feature_dir+'HowTo100M_sample_clip/*'))
+            features = list(glob.iglob(feature_dir+'HowTo100M_clip/*'))
         else:            
             features = list(glob.iglob(feature_dir+'howto100m_feature3d/*'))
             
@@ -41,16 +41,21 @@ class CoLDataset(Dataset):
         # self.keys_temp = [item.split('/')[-1].split('.')[0] for item in features0]
         # self.keys = list(set(self.keys).intersection(set(self.keys_temp)))
         if mode == 'train':
-            self.data = json.load(open(feature_dir+'pretraining_dataset_data_train.json'))
-            self.all_keys = json.load(open(feature_dir+'pretraining_dataset_keys_train.json'))
-            self.keys = list(set(self.all_keys).intersection(set(self.keys)))
+            self.data = json.load(open(feature_dir+'train_3k_data.json'))
+            self.keys = json.load(open(feature_dir+'train_3k_keys.json'))
+            # print('Length of all keys in train', len(self.all_keys))
+            # self.keys = list(set(self.all_keys).intersection(set(self.keys)))
+            # print('Length of keys in train', len(self.keys))
             self.keys = self.keys[:len(self.keys)//4*4]
+            print('Length of keys in train after', len(self.keys))
         else:
-            self.data = json.load(open(feature_dir+'pretraining_dataset_data_valid.json'))
-            self.all_keys = json.load(open(feature_dir+'pretraining_dataset_keys_valid.json'))
-            self.keys = list(set(self.all_keys).intersection(set(self.keys)))
+            self.data = json.load(open(feature_dir+'val_3k_data.json'))
+            self.keys = json.load(open(feature_dir+'val_3k_keys.json'))
+            # print('Length of all keys in val', len(self.all_keys))
+            # self.keys = list(set(self.all_keys).intersection(set(self.keys)))
+            # print('Length of keys in val', len(self.keys))
             self.keys = self.keys[:len(self.keys)//4*4]
-        print(len(self.keys)) 
+            print('Length of keys in val after', len(self.keys)) 
         self.max_v_len = 384
         self.sent_len = 128
 
@@ -83,6 +88,7 @@ class CoLDataset(Dataset):
                 
         start = self.data[example]["start"][start_index]
         end = self.data[example]["end"][stop_index]
+        print('self.use_clip', self.use_clip)
         if not self.use_clip:
             try: 
                 feat_resnet = np.load(os.path.join(feature_dir_data+'howto100m_feature/', "{}.npy".format(example)), allow_pickle=True)
@@ -93,15 +99,15 @@ class CoLDataset(Dataset):
                 feat_bn = np.zeros([self.max_v_len, 2048])
         else:
             try: 
-                feat_clip = np.load(os.path.join(feature_dir+'HowTo100M_sample_clip/', "{}.npy".format(example)), allow_pickle=True)
+                feat_clip = np.load(os.path.join(feature_dir+'HowTo100M_clip/', "{}.npy".format(example)), allow_pickle=True)
                 feat_clip/=np.linalg.norm(feat_clip, ord=2, axis=-1, keepdims=True)
                 # feat_resnet = np.load(os.path.join(feature_dir_data+'howto100m_feature/', "{}.npy".format(example)), allow_pickle=True)
                 # feat_resnet/=np.linalg.norm(feat_resnet, ord=2, axis=-1, keepdims=True)
                 # feat_resnet = np.concatenate([feat_resnet, feat_clip[:len(feat_resnet)]], -1)
                 # feat_bn = np.load(os.path.join(feature_dir_data+'howto100m_feature3d/', "{}.npy".format(example)), allow_pickle=True)
                 # feat_bn/=np.linalg.norm(feat_bn, ord=2, axis=-1, keepdims=True)
-            except:
-                print('didnt found the feature')
+            except Exception as e:
+                print(e)
                 # feat_resnet = np.zeros([self.max_v_len, 2048+512])
                 # feat_bn = np.zeros([self.max_v_len, 2048])
         # feat_bn = np.zeros([feat_resnet.shape[0], 2048])        
@@ -125,34 +131,41 @@ class CoLDataset(Dataset):
         return input_ids, voken_tensor
         
         
-    def _load_indexed_video_feature_untied(self, feat_resnet, feat_bn, timestamp_st, timestamp_ed):
+    def _load_indexed_video_feature_untied(self, feat_clip, timestamp_st, timestamp_ed):
         """ Untied version: [VID], ..., [VID], [PAD], ..., [PAD], len == max_v_len
         Returns:
             feat is padded to length of (self.max_v_len,)
             mask: self.max_v_len, with 1 indicates valid bits, 0 indicates padding
         """
         max_v_l = self.max_v_len
-        st3d, ed3d = min(math.floor(timestamp_st * 24.0/16.0), len(feat_bn)-2), min(math.ceil(timestamp_ed * 24.0/16.0), len(feat_bn)-1)
-        indexed_feat_len_3d = ed3d - st3d + 1
+        # st3d, ed3d = min(math.floor(timestamp_st * 24.0/16.0), len(feat_bn)-2), min(math.ceil(timestamp_ed * 24.0/16.0), len(feat_bn)-1)
+        # indexed_feat_len_3d = ed3d - st3d + 1
 
-        st2d, ed2d = min(math.floor(timestamp_st * 1), len(feat_resnet)-2), min(math.ceil(timestamp_ed * 1), len(feat_resnet)-1)
-        indexed_feat_len_2d = ed2d - st2d + 1
-        if indexed_feat_len_2d > max_v_l:
-            downsamlp_indices3d = np.linspace(st3d, ed3d, max_v_l, endpoint=True).astype(np.int).tolist()
-            downsamlp_indices2d = np.linspace(st2d, ed2d, max_v_l, endpoint=True).astype(np.int).tolist()
-            assert max(downsamlp_indices3d) < len(feat_bn) and max(downsamlp_indices2d) < len(feat_resnet)
-            feat = np.concatenate([feat_resnet[downsamlp_indices2d], feat_bn[downsamlp_indices3d]], -1)  # truncate, sample???
-            
+        # st2d, ed2d = min(math.floor(timestamp_st * 1), len(feat_resnet)-2), min(math.ceil(timestamp_ed * 1), len(feat_resnet)-1)
+        # indexed_feat_len_2d = ed2d - st2d + 1
+
+        stclip, edclip = min(math.floor(timestamp_st * 1), len(feat_clip)-2), min(math.ceil(timestamp_ed * 1), len(feat_clip)-1)
+        indexed_feat_len_clip = edclip - stclip + 1
+        if indexed_feat_len_clip > max_v_l:
+            # downsamlp_indices3d = np.linspace(st3d, ed3d, max_v_l, endpoint=True).astype(np.int).tolist()
+            # downsamlp_indices2d = np.linspace(st2d, ed2d, max_v_l, endpoint=True).astype(np.int).tolist()
+            downsamlp_indicesclip = np.linspace(stclip, edclip, max_v_l, endpoint=True).astype(np.int).tolist()
+            # assert max(downsamlp_indices3d) < len(feat_bn) and max(downsamlp_indices2d) < len(feat_resnet)
+            assert max(downsamlp_indicesclip) < len(feat_clip)
+            # feat = np.concatenate([feat_resnet[downsamlp_indices2d], feat_bn[downsamlp_indices3d]], -1)  # truncate, sample???
+            feat = feat_clip
             input_mask = np.ones(
             [self.max_v_len, self.max_v_len], dtype=int)
         else:
-            downsamlp_indices3d = np.linspace(st3d, ed3d, indexed_feat_len_2d, endpoint=True).astype(np.int).tolist()  
+            # downsamlp_indices3d = np.linspace(st3d, ed3d, indexed_feat_len_2d, endpoint=True).astype(np.int).tolist()  
             if self.use_clip:
-                feat = np.zeros((max_v_l, 2048+2048+512))  # only video features and padding
+                feat = np.zeros((max_v_l, 512))  # only video features and padding
             else:
                 feat = np.zeros((max_v_l, 2048+2048))
-            valid_l = ed2d - st2d + 1
-            feat[:valid_l] = np.concatenate([feat_resnet[st2d:ed2d + 1], feat_bn[downsamlp_indices3d]], -1)
+            # valid_l = ed2d - st2d + 1
+            valid_l = edclip - stclip + 1
+            # feat[:valid_l] = np.concatenate([feat_resnet[st2d:ed2d + 1], feat_bn[downsamlp_indices3d]], -1)
+            feat[:valid_l] = feat_clip[stclip:edclip + 1]
             input_mask = np.zeros(
             [self.max_v_len, self.max_v_len], dtype=int)
             input_mask[:, :len(feat)].fill(1)  
